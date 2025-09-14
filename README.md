@@ -1,7 +1,10 @@
-# 🎤 Artisan Voice Prototype
+# 🎤 ArtisanVoice: An AI-Powered Marketplace for Local Artisans
 
-Artisan Voice is an experimental prototype that blends **creativity, speech, and AI** to deliver a natural and expressive voice experience.  
-It enables artisans to showcase their work, interact through voice input, and connect with a marketplace ecosystem.
+Local artisans often face significant challenges, including illiteracy, language barriers, and a lack of digital skills, which prevent them from accessing online marketplaces and earning a fair value for their products. Our prototype, 
+
+ArtisanVoice, is an AI-powered solution designed to empower these artisans. It helps them easily sell their products online, reach a wider audience, and grow their business without needing advanced digital expertise.
+
+
 
 ---
 
