@@ -67,3 +67,21 @@ Artisan-Voice/
 ├── package.json
 ├── tsconfig.json
 └── README.md
+```
+## 📦 Installation
+```bash
+git clone https://github.com/aastha-yadav2/Artisan-Voice.git
+cd Artisan-Voice
+npm install
+```
+ ## ▶️ Usage
+ ```bash
+npm run dev
+```
+## 🤝 Contributing
+
+** Contributions welcome! Open issues or PRs for feedback, bug fixes, or features.**
+
+## 📜 License
+
+MIT License 
