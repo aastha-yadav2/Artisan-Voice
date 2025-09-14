@@ -1,0 +1,93 @@
+import React, { useState, useEffect, useCallback } from "react";
+import { Product } from "@/entities/Product";
+import { User } from "@/entities/User";
+import MarketplaceSearch from "../components/marketplace/MarketplaceSearch";
+import ProductGrid from "../components/marketplace/ProductGrid";
+import CategoryFilter from "../components/marketplace/CategoryFilter";
+
+export default function Marketplace() {
+  const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState(null);
+
+  const filterProducts = useCallback(() => {
+    let filtered = [...products];
+
+    // Filter by category
+    if (selectedCategory !== "all") {
+      filtered = filtered.filter(product => product.category === selectedCategory);
+    }
+
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(product => 
+        product.title.toLowerCase().includes(query) ||
+        product.description.toLowerCase().includes(query) ||
+        product.tags?.some(tag => tag.toLowerCase().includes(query)) ||
+        product.artisan_name.toLowerCase().includes(query)
+      );
+    }
+
+    setFilteredProducts(filtered);
+  }, [products, selectedCategory, searchQuery]);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    filterProducts();
+  }, [filterProducts]);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const currentUser = await User.me();
+      setUser(currentUser);
+      
+      const allProducts = await Product.filter({ status: "active" }, "-created_date");
+      setProducts(allProducts);
+    } catch (error) {
+      console.error("Failed to load marketplace data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="p-4 md:p-8 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="text-center mb-8">
+        <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent mb-4">
+          Artisan Marketplace
+        </h1>
+        <p className="text-gray-600 text-lg mb-6">
+          Discover unique handmade treasures from talented artisans worldwide
+        </p>
+        
+        {/* Voice Search */}
+        <MarketplaceSearch 
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          userLanguage={user?.preferred_language}
+        />
+      </div>
+
+      {/* Category Filters */}
+      <CategoryFilter 
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
+      />
+
+      {/* Products Grid */}
+      <ProductGrid 
+        products={filteredProducts}
+        isLoading={isLoading}
+      />
+    </div>
+  );
+}

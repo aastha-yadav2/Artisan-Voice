@@ -1,0 +1,88 @@
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { Product } from "@/entities/Product";
+import { User } from "@/entities/User";
+import { UploadFile, InvokeLLM, GenerateImage } from "@/integrations/Core";
+import VoiceInput from "../components/create/VoiceInput";
+import ImageCapture from "../components/create/ImageCapture";
+import ProductPreview from "../components/create/ProductPreview";
+
+export default function CreateProduct() {
+  const navigate = useNavigate();
+  const [step, setStep] = useState("voice"); // voice, image, preview
+  const [productData, setProductData] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        await User.me();
+      } catch(e) {
+        navigate(createPageUrl('SignIn'));
+      }
+    };
+    checkAuth();
+  }, [navigate]);
+
+  const handleVoiceComplete = (voiceData) => {
+    setProductData(prev => ({ ...prev, ...voiceData }));
+    setStep("image");
+  };
+
+  const handleImageComplete = (imageData) => {
+    setProductData(prev => ({ ...prev, ...imageData }));
+    setStep("preview");
+  };
+
+  const handleSaveProduct = async (finalData) => {
+    setIsLoading(true);
+    try {
+      const user = await User.me();
+      await Product.create({
+        ...finalData,
+        artisan_id: user.id,
+        artisan_name: user.full_name,
+        language: user.preferred_language,
+        location: user.location
+      });
+      navigate(createPageUrl("ArtisanDashboard"));
+    } catch (error) {
+      console.error("Failed to create product:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBack = () => {
+    if (step === "image") setStep("voice");
+    else if (step === "preview") setStep("image");
+    else navigate(createPageUrl("Dashboard"));
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50">
+      {step === "voice" && (
+        <VoiceInput 
+          onComplete={handleVoiceComplete}
+          onBack={handleBack}
+        />
+      )}
+      {step === "image" && (
+        <ImageCapture 
+          productData={productData}
+          onComplete={handleImageComplete}
+          onBack={handleBack}
+        />
+      )}
+      {step === "preview" && (
+        <ProductPreview 
+          productData={productData}
+          onSave={handleSaveProduct}
+          onBack={handleBack}
+          isLoading={isLoading}
+        />
+      )}
+    </div>
+  );
+}

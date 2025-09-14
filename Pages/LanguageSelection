@@ -1,0 +1,229 @@
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { User } from "@/entities/User";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Mic, Volume2, Globe, ArrowRight, Check, Accessibility } from "lucide-react";
+
+const languages = [
+  { code: "english", name: "English", flag: "🇺🇸", native: "English" },
+  { code: "spanish", name: "Spanish", flag: "🇪🇸", native: "Español" },
+  { code: "french", name: "French", flag: "🇫🇷", native: "Français" },
+  { code: "hindi", name: "Hindi", flag: "🇮🇳", native: "हिन्दी" },
+  { code: "arabic", name: "Arabic", flag: "🇸🇦", native: "العربية" },
+  { code: "portuguese", name: "Portuguese", flag: "🇵🇹", native: "Português" },
+  { code: "swahili", name: "Swahili", flag: "🇰🇪", native: "Kiswahili" },
+];
+
+const userTypes = [
+  {
+    type: "artisan",
+    title: "I'm an Artisan",
+    description: "I create and sell handmade products",
+    icon: "🎨",
+    color: "from-purple-500 to-pink-500"
+  },
+  {
+    type: "buyer",
+    title: "I'm a Buyer", 
+    description: "I want to discover unique handmade items",
+    icon: "🛍️",
+    color: "from-blue-500 to-cyan-500"
+  },
+  {
+    type: "both",
+    title: "Both",
+    description: "I create and buy handmade products",
+    icon: "🤝",
+    color: "from-amber-500 to-orange-500"
+  }
+];
+
+export default function LanguageSelection() {
+  const navigate = useNavigate();
+  const [selectedLanguage, setSelectedLanguage] = useState("english");
+  const [selectedUserType, setSelectedUserType] = useState(null);
+  const [voiceNavigation, setVoiceNavigation] = useState(false);
+  const [textToSpeech, setTextToSpeech] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleComplete = async () => {
+    if (!selectedUserType) return;
+    
+    setIsLoading(true);
+    try {
+      await User.updateMyUserData({
+        preferred_language: selectedLanguage,
+        user_type: selectedUserType,
+        voice_navigation: voiceNavigation,
+        text_to_speech: textToSpeech,
+        onboarding_completed: true
+      });
+      navigate(createPageUrl("Dashboard"));
+    } catch (error) {
+      console.error("Failed to save user preferences:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const speakLanguage = (language) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(`Hello, welcome to ArtisanVoice`);
+      utterance.lang = language.code === 'english' ? 'en-US' : 
+                     language.code === 'spanish' ? 'es-ES' :
+                     language.code === 'french' ? 'fr-FR' : 'en-US';
+      speechSynthesis.speak(utterance);
+    }
+  };
+
+  return (
+    <div className="min-h-screen px-6 py-8 max-w-4xl mx-auto">
+      <div className="text-center mb-8">
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <Globe className="w-8 h-8 text-orange-500" />
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+            Choose Your Preferences
+          </h1>
+        </div>
+        <p className="text-gray-600 text-lg">Help us personalize your experience</p>
+      </div>
+
+      <div className="space-y-8">
+        {/* Language Selection */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <span>🗣️</span> Preferred Language
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {languages.map((language) => (
+              <Card 
+                key={language.code}
+                className={`cursor-pointer transition-all transform hover:scale-105 ${
+                  selectedLanguage === language.code 
+                    ? "ring-2 ring-orange-500 bg-gradient-to-br from-orange-50 to-amber-50" 
+                    : "hover:shadow-lg"
+                }`}
+                onClick={() => setSelectedLanguage(language.code)}
+              >
+                <CardContent className="p-4 text-center">
+                  <div className="text-2xl mb-2">{language.flag}</div>
+                  <p className="font-medium text-gray-900">{language.name}</p>
+                  <p className="text-sm text-gray-600">{language.native}</p>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="mt-2 p-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      speakLanguage(language);
+                    }}
+                  >
+                    <Volume2 className="w-4 h-4" />
+                  </Button>
+                  {selectedLanguage === language.code && (
+                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
+                      <Check className="w-4 h-4 text-white" />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* User Type Selection */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <span>👤</span> I am a...
+          </h2>
+          <div className="grid md:grid-cols-3 gap-4">
+            {userTypes.map((type) => (
+              <Card
+                key={type.type}
+                className={`cursor-pointer transition-all transform hover:scale-105 ${
+                  selectedUserType === type.type
+                    ? "ring-2 ring-orange-500 bg-gradient-to-br from-orange-50 to-amber-50"
+                    : "hover:shadow-lg"
+                }`}
+                onClick={() => setSelectedUserType(type.type)}
+              >
+                <CardContent className="p-6 text-center relative">
+                  <div className="text-4xl mb-3">{type.icon}</div>
+                  <h3 className="font-semibold text-lg mb-2">{type.title}</h3>
+                  <p className="text-gray-600 text-sm">{type.description}</p>
+                  {selectedUserType === type.type && (
+                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
+                      <Check className="w-4 h-4 text-white" />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Accessibility Features */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Accessibility className="w-5 h-5" /> Accessibility Options
+          </h2>
+          <div className="grid md:grid-cols-2 gap-4">
+            <Card 
+              className={`cursor-pointer transition-all ${
+                voiceNavigation ? "ring-2 ring-orange-500 bg-gradient-to-br from-orange-50 to-amber-50" : ""
+              }`}
+              onClick={() => setVoiceNavigation(!voiceNavigation)}
+            >
+              <CardContent className="p-4 flex items-center gap-3">
+                <Mic className="w-6 h-6 text-orange-500" />
+                <div className="flex-1">
+                  <h3 className="font-medium">Voice Navigation</h3>
+                  <p className="text-sm text-gray-600">Navigate using voice commands</p>
+                </div>
+                {voiceNavigation && <Check className="w-5 h-5 text-orange-500" />}
+              </CardContent>
+            </Card>
+
+            <Card 
+              className={`cursor-pointer transition-all ${
+                textToSpeech ? "ring-2 ring-orange-500 bg-gradient-to-br from-orange-50 to-amber-50" : ""
+              }`}
+              onClick={() => setTextToSpeech(!textToSpeech)}
+            >
+              <CardContent className="p-4 flex items-center gap-3">
+                <Volume2 className="w-6 h-6 text-orange-500" />
+                <div className="flex-1">
+                  <h3 className="font-medium">Text-to-Speech</h3>
+                  <p className="text-sm text-gray-600">Read content aloud</p>
+                </div>
+                {textToSpeech && <Check className="w-5 h-5 text-orange-500" />}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Continue Button */}
+        <div className="text-center pt-4">
+          <Button
+            onClick={handleComplete}
+            disabled={!selectedUserType || isLoading}
+            size="lg"
+            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold px-8 py-4 rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 disabled:opacity-50"
+          >
+            {isLoading ? (
+              "Setting up your account..."
+            ) : (
+              <>
+                Complete Setup
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

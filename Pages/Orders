@@ -1,0 +1,365 @@
+
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { Order } from "@/entities/Order";
+import { User } from "@/entities/User";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Package, Search, Filter, TrendingUp, ShoppingBag, Clock, CheckCircle2, Truck, MapPin } from "lucide-react";
+
+export default function Orders() {
+  const navigate = useNavigate();
+  const [orders, setOrders] = useState([]);
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState("all");
+
+  const loadData = useCallback(async () => {
+    try {
+      const currentUser = await User.me();
+      setUser(currentUser);
+      
+      let userOrders = [];
+      if (currentUser.user_type === "artisan" || currentUser.user_type === "both") {
+        // Get orders as seller
+        const sellerOrders = await Order.filter({ artisan_id: currentUser.id }, "-created_date");
+        userOrders = [...userOrders, ...sellerOrders];
+      }
+      
+      if (currentUser.user_type === "buyer" || currentUser.user_type === "both") {
+        // Get orders as buyer
+        const buyerOrders = await Order.filter({ buyer_id: currentUser.id }, "-created_date");
+        userOrders = [...userOrders, ...buyerOrders];
+      }
+      
+      setOrders(userOrders);
+    } catch (error) {
+      console.error("Failed to load orders:", error);
+      navigate(createPageUrl('SignIn'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [navigate]);
+
+  const filterOrders = useCallback(() => {
+    let filtered = [...orders];
+
+    // Filter by tab (role-based)
+    if (activeTab === "selling") {
+      filtered = filtered.filter(order => order.artisan_id === user?.id);
+    } else if (activeTab === "buying") {
+      filtered = filtered.filter(order => order.buyer_id === user?.id);
+    }
+
+    // Filter by search
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(order => 
+        order.product_title.toLowerCase().includes(query) ||
+        order.buyer_name.toLowerCase().includes(query) ||
+        order.artisan_name.toLowerCase().includes(query)
+      );
+    }
+
+    // Filter by status
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(order => order.status === statusFilter);
+    }
+
+    setFilteredOrders(filtered);
+  }, [orders, searchQuery, statusFilter, activeTab, user?.id]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    filterOrders();
+  }, [filterOrders]);
+
+  const getStats = () => {
+    const sellerOrders = orders.filter(order => order.artisan_id === user?.id);
+    const buyerOrders = orders.filter(order => order.buyer_id === user?.id);
+    
+    const totalRevenue = sellerOrders.reduce((sum, order) => sum + (order.price || 0), 0);
+    const totalSpent = buyerOrders.reduce((sum, order) => sum + (order.price || 0), 0);
+    const pendingOrders = orders.filter(order => !["delivered", "cancelled"].includes(order.status)).length;
+    
+    return { 
+      totalOrders: orders.length, 
+      totalRevenue, 
+      totalSpent, 
+      pendingOrders,
+      sellerOrders: sellerOrders.length,
+      buyerOrders: buyerOrders.length
+    };
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case "ordered": return <Clock className="w-4 h-4" />;
+      case "confirmed": return <CheckCircle2 className="w-4 h-4" />;
+      case "packed": return <Package className="w-4 h-4" />;
+      case "shipped": return <Truck className="w-4 h-4" />;
+      case "delivered": return <CheckCircle2 className="w-4 h-4" />;
+      default: return <Package className="w-4 h-4" />;
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "ordered": return "bg-yellow-100 text-yellow-800";
+      case "confirmed": return "bg-blue-100 text-blue-800";
+      case "packed": return "bg-purple-100 text-purple-800";
+      case "shipped": return "bg-orange-100 text-orange-800";
+      case "delivered": return "bg-green-100 text-green-800";
+      case "cancelled": return "bg-red-100 text-red-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const stats = getStats();
+  const isArtisan = user?.user_type === "artisan" || user?.user_type === "both";
+  const isBuyer = user?.user_type === "buyer" || user?.user_type === "both";
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
+        <div className="w-16 h-16 border-4 border-orange-500 border-dashed rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 md:p-8 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
+        <p className="text-gray-600">Track your orders and sales</p>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-blue-600 font-medium">Total Orders</p>
+                <p className="text-2xl font-bold text-blue-900">{stats.totalOrders}</p>
+              </div>
+              <Package className="w-8 h-8 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-green-600 font-medium">Revenue</p>
+                <p className="text-2xl font-bold text-green-900">${stats.totalRevenue.toFixed(2)}</p>
+              </div>
+              <TrendingUp className="w-8 h-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-purple-600 font-medium">Spent</p>
+                <p className="text-2xl font-bold text-purple-900">${stats.totalSpent.toFixed(2)}</p>
+              </div>
+              <ShoppingBag className="w-8 h-8 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-orange-600 font-medium">Pending</p>
+                <p className="text-2xl font-bold text-orange-900">{stats.pendingOrders}</p>
+              </div>
+              <Clock className="w-8 h-8 text-orange-500" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tabs for different views */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="all">All Orders ({stats.totalOrders})</TabsTrigger>
+          {isArtisan && (
+            <TabsTrigger value="selling">Selling ({stats.sellerOrders})</TabsTrigger>
+          )}
+          {isBuyer && (
+            <TabsTrigger value="buying">Buying ({stats.buyerOrders})</TabsTrigger>
+          )}
+        </TabsList>
+      </Tabs>
+
+      {/* Filters */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search orders by product, buyer, or seller..."
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="ordered">Ordered</SelectItem>
+                <SelectItem value="confirmed">Confirmed</SelectItem>
+                <SelectItem value="packed">Packed</SelectItem>
+                <SelectItem value="shipped">Shipped</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Orders List */}
+      {filteredOrders.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center">
+            <Package className="w-12 h-12 text-gray-400" />
+          </div>
+          <h3 className="text-xl font-semibold text-gray-600 mb-2">
+            {orders.length === 0 ? "No orders yet" : "No orders found"}
+          </h3>
+          <p className="text-gray-500">
+            {orders.length === 0 
+              ? "Orders will appear here once you start buying or selling" 
+              : "Try adjusting your search or filters"
+            }
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredOrders.map((order) => (
+            <Card key={order.id} className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row gap-4">
+                  {/* Product Image */}
+                  <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    {order.product_image_url ? (
+                      <img 
+                        src={order.product_image_url} 
+                        alt={order.product_title}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    ) : (
+                      <Package className="w-8 h-8 text-gray-400" />
+                    )}
+                  </div>
+
+                  {/* Order Details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2 mb-3">
+                      <div>
+                        <h3 className="font-semibold text-lg text-gray-900 truncate">
+                          {order.product_title}
+                        </h3>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <p>Order #{order.id.slice(-8)}</p>
+                          <p>
+                            {order.artisan_id === user?.id ? (
+                              <>Buyer: {order.buyer_name}</>
+                            ) : (
+                              <>Seller: {order.artisan_name}</>
+                            )}
+                          </p>
+                          {order.shipping_address && (
+                            <p className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {order.shipping_address}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-green-600">${order.price}</p>
+                        <Badge className={getStatusColor(order.status)}>
+                          <div className="flex items-center gap-1">
+                            {getStatusIcon(order.status)}
+                            <span className="capitalize">{order.status}</span>
+                          </div>
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {/* Payment Status */}
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                      <div className="flex items-center gap-4 text-sm text-gray-600">
+                        <div className="flex items-center gap-1">
+                          <span>Payment:</span>
+                          <Badge 
+                            variant="outline"
+                            className={
+                              order.payment_status === "paid" ? "border-green-500 text-green-700" :
+                              order.payment_status === "pending" ? "border-yellow-500 text-yellow-700" :
+                              "border-red-500 text-red-700"
+                            }
+                          >
+                            {order.payment_status}
+                          </Badge>
+                        </div>
+                        
+                        {order.tracking_number && (
+                          <div>
+                            <span>Tracking: </span>
+                            <code className="bg-gray-100 px-2 py-1 rounded text-xs">
+                              {order.tracking_number}
+                            </code>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          View Details
+                        </Button>
+                        {order.artisan_id === user?.id && order.status === "ordered" && (
+                          <Button size="sm" className="bg-green-500 hover:bg-green-600">
+                            Confirm Order
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

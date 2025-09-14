@@ -1,0 +1,110 @@
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { User } from "@/entities/User";
+import { Button } from "@/components/ui/button";
+import { Heart, Mic, Users, ShoppingBag } from "lucide-react";
+
+export default function SignIn() {
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    // Check if the user is already logged in
+    const checkUser = async () => {
+      try {
+        const user = await User.me();
+        if (user) {
+          // If logged in, go to the dashboard
+          navigate(createPageUrl("Dashboard"));
+        }
+      } catch (e) {
+        // Not logged in, so show the sign-in page
+        setIsLoading(false);
+      }
+    };
+    checkUser();
+  }, [navigate]);
+
+  const handleLogin = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await User.login();
+      // The user will be redirected by the login flow.
+      // If the flow returns here (e.g., popup closed), stop loading.
+      setIsLoading(false);
+    } catch (e) {
+      setError("Login failed. Please try again.");
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading && !error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full animate-pulse"></div>
+          <p className="text-lg font-medium text-gray-700">Checking session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 px-6 relative overflow-hidden">
+      <div className="absolute inset-0">
+        <div className="absolute top-10 left-20 w-24 h-24 bg-gradient-to-br from-amber-200 to-orange-200 rounded-full opacity-60 animate-pulse"></div>
+        <div className="absolute bottom-16 right-24 w-16 h-16 bg-gradient-to-br from-orange-200 to-red-200 rounded-full opacity-50 animate-pulse delay-500"></div>
+      </div>
+
+      <div className="text-center max-w-lg mx-auto z-10 p-8 bg-white/70 backdrop-blur-lg rounded-3xl shadow-2xl">
+        <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full flex items-center justify-center shadow-xl">
+          <Heart className="w-12 h-12 text-white" />
+        </div>
+
+        <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent mb-3">
+          Welcome to ArtisanVoice
+        </h1>
+
+        <p className="text-xl text-gray-700 font-medium mb-6">
+          The marketplace where every artisan has a voice.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 text-gray-700">
+          <div className="flex flex-col items-center">
+            <Mic className="w-7 h-7 text-orange-500 mb-2" />
+            <p className="font-medium">Voice-Powered</p>
+            <p className="text-sm text-gray-600">List items with your voice.</p>
+          </div>
+          <div className="flex flex-col items-center">
+            <Users className="w-7 h-7 text-purple-500 mb-2" />
+            <p className="font-medium">Support Artisans</p>
+            <p className="text-sm text-gray-600">Buy unique, handmade goods.</p>
+          </div>
+          <div className="flex flex-col items-center">
+            <ShoppingBag className="w-7 h-7 text-green-500 mb-2" />
+            <p className="font-medium">Discover Crafts</p>
+            <p className="text-sm text-gray-600">Find one-of-a-kind items.</p>
+          </div>
+        </div>
+
+        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+
+        <Button
+          onClick={handleLogin}
+          disabled={isLoading}
+          size="lg"
+          className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-4 rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+        >
+          {isLoading ? "Redirecting..." : "Sign In & Get Started"}
+        </Button>
+
+        <p className="text-xs text-gray-500 mt-4">
+          By signing in, you agree to our Terms of Service.
+        </p>
+      </div>
+    </div>
+  );
+}

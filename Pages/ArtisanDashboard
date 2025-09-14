@@ -1,0 +1,319 @@
+
+import React, { useState, useEffect, useCallback } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { Product } from "@/entities/Product";
+import { User } from "@/entities/User";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Heart, Plus, Edit, Trash2, Search, Filter, Eye, TrendingUp } from "lucide-react";
+
+export default function ArtisanDashboard() {
+  const navigate = useNavigate();
+  const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+
+  const loadData = useCallback(async () => {
+    try {
+      const currentUser = await User.me();
+      setUser(currentUser);
+      
+      const userProducts = await Product.filter({ artisan_id: currentUser.id }, "-created_date");
+      setProducts(userProducts);
+    } catch (error) {
+      console.error("Failed to load products:", error);
+      navigate(createPageUrl('SignIn'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [navigate]); // Added navigate as a dependency
+
+  const filterProducts = useCallback(() => {
+    let filtered = [...products];
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(product => 
+        product.title.toLowerCase().includes(query) ||
+        product.description.toLowerCase().includes(query)
+      );
+    }
+
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(product => product.status === statusFilter);
+    }
+
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter(product => product.category === categoryFilter);
+    }
+
+    setFilteredProducts(filtered);
+  }, [products, searchQuery, statusFilter, categoryFilter]); // Added all necessary dependencies
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]); // Now depends on the memoized loadData
+
+  useEffect(() => {
+    filterProducts();
+  }, [filterProducts]); // Now depends on the memoized filterProducts
+
+  const getStats = () => {
+    const activeProducts = products.filter(p => p.status === "active").length;
+    const soldProducts = products.filter(p => p.status === "sold").length;
+    const totalRevenue = products.filter(p => p.status === "sold").reduce((sum, p) => sum + (p.price || 0), 0);
+    
+    return { activeProducts, soldProducts, totalRevenue, totalProducts: products.length };
+  };
+
+  const stats = getStats();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
+        <div className="w-16 h-16 border-4 border-orange-500 border-dashed rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 md:p-8 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">My Products</h1>
+          <p className="text-gray-600">Manage your handmade creations</p>
+        </div>
+        
+        <Link to={createPageUrl("CreateProduct")}>
+          <Button 
+            size="lg"
+            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add New Product
+          </Button>
+        </Link>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-blue-600 font-medium">Total Products</p>
+                <p className="text-2xl font-bold text-blue-900">{stats.totalProducts}</p>
+              </div>
+              <Heart className="w-8 h-8 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-green-600 font-medium">Active</p>
+                <p className="text-2xl font-bold text-green-900">{stats.activeProducts}</p>
+              </div>
+              <Eye className="w-8 h-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-purple-600 font-medium">Sold</p>
+                <p className="text-2xl font-bold text-purple-900">{stats.soldProducts}</p>
+              </div>
+              <TrendingUp className="w-8 h-8 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-yellow-600 font-medium">Revenue</p>
+                <p className="text-2xl font-bold text-yellow-900">${stats.totalRevenue.toFixed(2)}</p>
+              </div>
+              <TrendingUp className="w-8 h-8 text-yellow-500" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search your products..."
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="sold">Sold</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="textiles">Textiles</SelectItem>
+                <SelectItem value="pottery">Pottery</SelectItem>
+                <SelectItem value="jewelry">Jewelry</SelectItem>
+                <SelectItem value="woodwork">Woodwork</SelectItem>
+                <SelectItem value="metalwork">Metalwork</SelectItem>
+                <SelectItem value="paintings">Paintings</SelectItem>
+                <SelectItem value="sculptures">Sculptures</SelectItem>
+                <SelectItem value="crafts">Crafts</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Products Grid */}
+      {filteredProducts.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center">
+            <Heart className="w-12 h-12 text-gray-400" />
+          </div>
+          <h3 className="text-xl font-semibold text-gray-600 mb-2">
+            {products.length === 0 ? "No products yet" : "No products found"}
+          </h3>
+          <p className="text-gray-500 mb-6">
+            {products.length === 0 
+              ? "Start by creating your first product listing" 
+              : "Try adjusting your search or filters"
+            }
+          </p>
+          {products.length === 0 && (
+            <Link to={createPageUrl("CreateProduct")}>
+              <Button className="bg-gradient-to-r from-amber-500 to-orange-500">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Your First Product
+              </Button>
+            </Link>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredProducts.map((product) => (
+            <Card key={product.id} className="group overflow-hidden hover:shadow-xl transition-all transform hover:scale-105">
+              <div className="relative aspect-square bg-gray-100 overflow-hidden">
+                {product.image_url ? (
+                  <img 
+                    src={product.image_url} 
+                    alt={product.title}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Heart className="w-12 h-12 text-gray-400" />
+                  </div>
+                )}
+                
+                {/* Status badge */}
+                <div className="absolute top-2 right-2">
+                  <Badge 
+                    className={
+                      product.status === "active" ? "bg-green-100 text-green-800" :
+                      product.status === "sold" ? "bg-blue-100 text-blue-800" :
+                      "bg-gray-100 text-gray-800"
+                    }
+                  >
+                    {product.status}
+                  </Badge>
+                </div>
+
+                {/* Enhanced badge */}
+                {product.enhanced_image_url && (
+                  <div className="absolute top-2 left-2">
+                    <Badge className="bg-purple-100 text-purple-700 text-xs">
+                      ✨ Enhanced
+                    </Badge>
+                  </div>
+                )}
+              </div>
+
+              <CardContent className="p-4">
+                <div className="mb-3">
+                  <h3 className="font-semibold text-gray-900 line-clamp-2 mb-1">{product.title}</h3>
+                  <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
+                </div>
+
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-2xl font-bold text-green-600">${product.price}</p>
+                    <Badge variant="secondary" className="text-xs capitalize mt-1">
+                      {product.category}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Tags */}
+                {product.tags && product.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {product.tags.slice(0, 3).map((tag, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                    {product.tags.length > 3 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{product.tags.length - 3}
+                      </Badge>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1">
+                    <Edit className="w-4 h-4 mr-1" />
+                    Edit
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-1">
+                    <Eye className="w-4 h-4 mr-1" />
+                    View
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

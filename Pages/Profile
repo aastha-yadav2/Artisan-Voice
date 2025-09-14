@@ -1,0 +1,463 @@
+
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { User } from "@/entities/User";
+import { Product } from "@/entities/Product";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { 
+  User as UserIcon, 
+  Edit, 
+  Save, 
+  Heart, 
+  MapPin, 
+  Globe, 
+  Mic, 
+  Volume2, 
+  Settings, 
+  LogOut,
+  Camera,
+  Star
+} from "lucide-react";
+
+const languages = [
+  { code: "english", name: "English", flag: "🇺🇸" },
+  { code: "spanish", name: "Spanish", flag: "🇪🇸" },
+  { code: "french", name: "French", flag: "🇫🇷" },
+  { code: "hindi", name: "Hindi", flag: "🇮🇳" },
+  { code: "arabic", name: "Arabic", flag: "🇸🇦" },
+  { code: "portuguese", name: "Portuguese", flag: "🇵🇹" },
+  { code: "swahili", name: "Swahili", flag: "🇰🇪" },
+];
+
+export default function Profile() {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editedData, setEditedData] = useState({});
+
+  const loadData = React.useCallback(async () => {
+    try {
+      const currentUser = await User.me();
+      setUser(currentUser);
+      setEditedData({
+        full_name: currentUser.full_name || "",
+        bio: currentUser.bio || "",
+        location: currentUser.location || "",
+        specialization: currentUser.specialization || "",
+        preferred_language: currentUser.preferred_language || "english",
+        voice_navigation: currentUser.voice_navigation || false,
+        text_to_speech: currentUser.text_to_speech || false,
+        user_type: currentUser.user_type || "buyer"
+      });
+
+      if (currentUser.user_type === "artisan" || currentUser.user_type === "both") {
+        const userProducts = await Product.filter({ artisan_id: currentUser.id }, "-created_date", 6);
+        setProducts(userProducts);
+      }
+    } catch (error) {
+      console.error("Failed to load profile:", error);
+      navigate(createPageUrl('SignIn'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await User.updateMyUserData(editedData);
+      setUser(prev => ({ ...prev, ...editedData }));
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await User.logout();
+      navigate(createPageUrl('SignIn'));
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
+  const getProfileStats = () => {
+    const activeProducts = products.filter(p => p.status === "active").length;
+    const totalProducts = products.length;
+    const memberSince = user?.created_date ? new Date(user.created_date).getFullYear() : new Date().getFullYear();
+    
+    return { activeProducts, totalProducts, memberSince };
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
+        <div className="w-16 h-16 border-4 border-orange-500 border-dashed rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  const stats = getProfileStats();
+  const isArtisan = user?.user_type === "artisan" || user?.user_type === "both";
+
+  return (
+    <div className="p-4 md:p-8 max-w-4xl mx-auto">
+      {/* Profile Header */}
+      <Card className="mb-8 overflow-hidden">
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 h-32 relative">
+          <div className="absolute inset-0 bg-black/20"></div>
+        </div>
+        <CardContent className="relative -mt-16 pb-6">
+          <div className="flex flex-col md:flex-row items-start md:items-end gap-6">
+            {/* Profile Picture */}
+            <div className="relative">
+              <div className="w-32 h-32 bg-white rounded-full border-4 border-white shadow-xl flex items-center justify-center">
+                <div className="w-28 h-28 bg-gradient-to-br from-amber-400 to-orange-400 rounded-full flex items-center justify-center">
+                  <span className="text-3xl font-bold text-white">
+                    {user?.full_name?.[0]?.toUpperCase() || "U"}
+                  </span>
+                </div>
+              </div>
+              <button className="absolute bottom-2 right-2 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors">
+                <Camera className="w-4 h-4 text-gray-600" />
+              </button>
+            </div>
+
+            {/* Profile Info */}
+            <div className="flex-1 text-center md:text-left">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                {user?.full_name || "User"}
+              </h1>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-3">
+                <Badge className="bg-orange-100 text-orange-800 capitalize">
+                  {user?.user_type}
+                </Badge>
+                {user?.location && (
+                  <div className="flex items-center text-gray-600">
+                    <MapPin className="w-4 h-4 mr-1" />
+                    <span className="text-sm">{user.location}</span>
+                  </div>
+                )}
+                <div className="flex items-center text-gray-600">
+                  <Globe className="w-4 h-4 mr-1" />
+                  <span className="text-sm capitalize">
+                    {languages.find(lang => lang.code === user?.preferred_language)?.name || "English"}
+                  </span>
+                </div>
+              </div>
+              {user?.bio && (
+                <p className="text-gray-600 mb-4">{user.bio}</p>
+              )}
+
+              {/* Quick Stats */}
+              <div className="flex items-center justify-center md:justify-start gap-6">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-gray-900">{stats.totalProducts}</p>
+                  <p className="text-sm text-gray-600">Products</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-gray-900">{stats.memberSince}</p>
+                  <p className="text-sm text-gray-600">Member Since</p>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <Star className="w-4 h-4 text-yellow-500" />
+                    <p className="text-2xl font-bold text-gray-900">4.8</p>
+                  </div>
+                  <p className="text-sm text-gray-600">Rating</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setIsEditing(!isEditing)}
+                variant="outline"
+                className="border-orange-200 text-orange-600 hover:bg-orange-50"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                {isEditing ? "Cancel" : "Edit Profile"}
+              </Button>
+              <Button
+                onClick={handleLogout}
+                variant="outline"
+                className="border-red-200 text-red-600 hover:bg-red-50"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Tabs defaultValue="profile" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+          {isArtisan && <TabsTrigger value="products">My Products</TabsTrigger>}
+        </TabsList>
+
+        {/* Profile Tab */}
+        <TabsContent value="profile">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserIcon className="w-5 h-5 text-orange-500" />
+                Profile Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">Full Name</label>
+                  {isEditing ? (
+                    <Input
+                      value={editedData.full_name}
+                      onChange={(e) => setEditedData(prev => ({ ...prev, full_name: e.target.value }))}
+                      placeholder="Your full name"
+                    />
+                  ) : (
+                    <p className="p-3 bg-gray-50 rounded-lg">{user?.full_name || "Not set"}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">User Type</label>
+                  {isEditing ? (
+                    <Select
+                      value={editedData.user_type}
+                      onValueChange={(value) => setEditedData(prev => ({ ...prev, user_type: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="buyer">Buyer</SelectItem>
+                        <SelectItem value="artisan">Artisan</SelectItem>
+                        <SelectItem value="both">Both</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="p-3 bg-gray-50 rounded-lg capitalize">{user?.user_type}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">Location</label>
+                  {isEditing ? (
+                    <Input
+                      value={editedData.location}
+                      onChange={(e) => setEditedData(prev => ({ ...prev, location: e.target.value }))}
+                      placeholder="Your location"
+                    />
+                  ) : (
+                    <p className="p-3 bg-gray-50 rounded-lg">{user?.location || "Not set"}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">Specialization</label>
+                  {isEditing ? (
+                    <Input
+                      value={editedData.specialization}
+                      onChange={(e) => setEditedData(prev => ({ ...prev, specialization: e.target.value }))}
+                      placeholder="Your craft specialization"
+                    />
+                  ) : (
+                    <p className="p-3 bg-gray-50 rounded-lg">{user?.specialization || "Not set"}</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">Bio</label>
+                {isEditing ? (
+                  <Textarea
+                    value={editedData.bio}
+                    onChange={(e) => setEditedData(prev => ({ ...prev, bio: e.target.value }))}
+                    placeholder="Tell us about yourself and your craft..."
+                    rows={4}
+                  />
+                ) : (
+                  <p className="p-3 bg-gray-50 rounded-lg min-h-[100px]">{user?.bio || "No bio yet"}</p>
+                )}
+              </div>
+
+              {isEditing && (
+                <div className="flex justify-end gap-3">
+                  <Button
+                    onClick={() => setIsEditing(false)}
+                    variant="outline"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="bg-gradient-to-r from-amber-500 to-orange-500"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    {isSaving ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Settings Tab */}
+        <TabsContent value="settings">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-purple-500" />
+                App Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">Preferred Language</label>
+                <Select
+                  value={editedData.preferred_language}
+                  onValueChange={(value) => {
+                    setEditedData(prev => ({ ...prev, preferred_language: value }));
+                    // Auto-save language changes
+                    User.updateMyUserData({ preferred_language: value });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {languages.map((lang) => (
+                      <SelectItem key={lang.code} value={lang.code}>
+                        <div className="flex items-center gap-2">
+                          <span>{lang.flag}</span>
+                          <span>{lang.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900">Accessibility Features</h3>
+                
+                <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Mic className="w-6 h-6 text-purple-500" />
+                    <div>
+                      <h4 className="font-medium text-gray-900">Voice Navigation</h4>
+                      <p className="text-sm text-gray-600">Navigate the app using voice commands</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={editedData.voice_navigation}
+                    onCheckedChange={(checked) => {
+                      setEditedData(prev => ({ ...prev, voice_navigation: checked }));
+                      User.updateMyUserData({ voice_navigation: checked });
+                    }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Volume2 className="w-6 h-6 text-blue-500" />
+                    <div>
+                      <h4 className="font-medium text-gray-900">Text-to-Speech</h4>
+                      <p className="text-sm text-gray-600">Read content aloud</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={editedData.text_to_speech}
+                    onCheckedChange={(checked) => {
+                      setEditedData(prev => ({ ...prev, text_to_speech: checked }));
+                      User.updateMyUserData({ text_to_speech: checked });
+                    }}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Products Tab - Only for Artisans */}
+        {isArtisan && (
+          <TabsContent value="products">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Heart className="w-5 h-5 text-pink-500" />
+                  My Products Preview
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {products.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Heart className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                    <h3 className="text-lg font-semibold text-gray-600 mb-2">No products yet</h3>
+                    <p className="text-gray-500 mb-4">Start creating your first product</p>
+                    <Button className="bg-gradient-to-r from-amber-500 to-orange-500">
+                      Create Product
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                      {products.map((product) => (
+                        <div key={product.id} className="bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors">
+                          <div className="aspect-square bg-white rounded-lg mb-2 overflow-hidden">
+                            {product.image_url ? (
+                              <img 
+                                src={product.image_url} 
+                                alt={product.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Heart className="w-8 h-8 text-gray-400" />
+                              </div>
+                            )}
+                          </div>
+                          <h4 className="font-medium text-sm text-gray-900 truncate">{product.title}</h4>
+                          <p className="text-sm font-semibold text-green-600">${product.price}</p>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="text-center">
+                      <Button variant="outline" onClick={() => navigate(createPageUrl("ArtisanDashboard"))}>
+                        View All Products
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+      </Tabs>
+    </div>
+  );
+}
