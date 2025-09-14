@@ -1,0 +1,356 @@
+
+import React, { useState, useRef } from "react";
+import { InvokeLLM } from "@/integrations/Core";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert"; // New import
+import { Mic, MicOff, ArrowLeft, ArrowRight, Volume2, Wand2, AlertCircle } from "lucide-react"; // AlertCircle new import
+
+export default function VoiceInput({ onComplete, onBack }) {
+  const [isRecording, setIsRecording] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [generatedData, setGeneratedData] = useState(null);
+  const [speechError, setSpeechError] = useState(null); // New state for speech errors
+  const recognitionRef = useRef(null);
+
+  const startRecording = async () => {
+    setSpeechError(null); // Clear previous errors
+
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      setSpeechError("Speech recognition is not supported in this browser. Please try Chrome, Edge, or Safari.");
+      return;
+    }
+
+    try {
+      // Request microphone permission first
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (permissionError) {
+      setSpeechError("Microphone access denied. Please allow microphone access in your browser settings and try again.");
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+    
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      setIsRecording(true);
+      setSpeechError(null); // Clear errors once recording successfully starts
+    };
+
+    recognition.onresult = (event) => {
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        }
+      }
+      if (finalTranscript) {
+        setTranscript(prev => prev + ' ' + finalTranscript);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setIsRecording(false);
+      
+      switch (event.error) {
+        case 'not-allowed':
+          setSpeechError("Microphone access denied. Please click the microphone icon in your browser's address bar and allow access, then try again.");
+          break;
+        case 'no-speech':
+          setSpeechError("No speech detected. Please try speaking closer to your microphone.");
+          break;
+        case 'audio-capture':
+          setSpeechError("No microphone found. Please check that your microphone is connected and working.");
+          break;
+        case 'network':
+          setSpeechError("Network error occurred. Please check your internet connection and try again.");
+          break;
+        case 'aborted':
+          // User manually stopped or something interrupted, not necessarily an error to show
+          break;
+        default:
+          setSpeechError(`Speech recognition error: ${event.error}. Please try typing instead.`);
+      }
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+
+    try {
+      recognition.start();
+    } catch (error) {
+      // Catch synchronous errors that might occur if start() fails immediately
+      setSpeechError("Failed to start speech recognition. Please try typing instead.");
+      setIsRecording(false);
+    }
+  };
+
+  const stopRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setIsRecording(false);
+  };
+
+  const generateProductInfo = async () => {
+    if (!transcript.trim()) return;
+    
+    setIsProcessing(true);
+    try {
+      const result = await InvokeLLM({
+        prompt: `Based on this artisan's voice description, generate product information:
+        
+        Voice description: "${transcript}"
+        
+        Create a professional product listing with:
+        1. A catchy, SEO-friendly title
+        2. A detailed description highlighting craftsmanship and uniqueness
+        3. Suggest appropriate tags for discoverability
+        4. Estimate a fair price range
+        5. Determine the best category
+        
+        Make it sound authentic and highlight the artisan's passion and skill.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            description: { type: "string" },
+            tags: { 
+              type: "array",
+              items: { type: "string" }
+            },
+            price_range: { type: "string" },
+            suggested_price: { type: "number" },
+            category: { 
+              type: "string",
+              enum: ["textiles", "pottery", "jewelry", "woodwork", "metalwork", "paintings", "sculptures", "crafts", "other"]
+            },
+            key_features: {
+              type: "array", 
+              items: { type: "string" }
+            }
+          }
+        }
+      });
+
+      setGeneratedData(result);
+    } catch (error) {
+      console.error("Failed to generate product info:", error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleContinue = () => {
+    if (!generatedData) return;
+    
+    onComplete({
+      title: generatedData.title,
+      description: generatedData.description,
+      tags: generatedData.tags,
+      price: generatedData.suggested_price,
+      category: generatedData.category,
+      voice_transcript: transcript
+    });
+  };
+
+  const speakText = (text) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      speechSynthesis.speak(utterance);
+    }
+  };
+
+  return (
+    <div className="p-4 md:p-8 max-w-4xl mx-auto">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="outline" size="icon" onClick={onBack}>
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Describe Your Product</h1>
+          <p className="text-gray-600">Tell us about your handmade creation using voice or text</p> {/* Updated text */}
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        {/* Speech Error Alert */}
+        {speechError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-sm">
+              {speechError}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Voice Input Section */}
+        <Card className="border-none shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mic className="w-5 h-5 text-orange-500" />
+              Voice Description
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-center">
+              <Button
+                onClick={isRecording ? stopRecording : startRecording}
+                size="lg"
+                className={`w-32 h-32 rounded-full text-white shadow-2xl transition-all transform hover:scale-105 ${
+                  isRecording 
+                    ? "bg-gradient-to-r from-red-500 to-pink-500 animate-pulse" 
+                    : "bg-gradient-to-r from-orange-500 to-red-500"
+                }`}
+              >
+                {isRecording ? (
+                  <MicOff className="w-8 h-8" />
+                ) : (
+                  <Mic className="w-8 h-8" />
+                )}
+              </Button>
+              <p className="mt-4 text-gray-600">
+                {isRecording ? "Listening... Tap to stop" : "Tap the microphone to start recording"}
+              </p>
+              {isRecording && (
+                <div className="flex justify-center mt-2">
+                  <Badge className="bg-red-100 text-red-700 animate-pulse">
+                    🔴 Recording
+                  </Badge>
+                </div>
+              )}
+              
+              {/* Microphone permission tips */}
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-gray-600">
+                <p className="font-medium text-blue-800 mb-1">💡 Voice Recording Tips:</p>
+                <ul className="text-left space-y-1 text-xs">
+                  <li>• Allow microphone access when prompted by your browser</li>
+                  <li>• Speak clearly about 6 inches from your device</li>
+                  <li>• If voice recording doesn't work, you can type your description below</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Transcript */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Your Description:</label>
+              <Textarea
+                value={transcript}
+                onChange={(e) => setTranscript(e.target.value)}
+                placeholder="Start speaking or type your product description here..."
+                rows={4}
+                className="text-base"
+              />
+              <p className="text-xs text-gray-500">
+                You can type directly here if voice recording doesn't work on your device.
+              </p>
+            </div>
+
+            {transcript && (
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => speakText(transcript)}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Volume2 className="w-4 h-4 mr-2" />
+                  Play Back
+                </Button>
+                <Button 
+                  onClick={generateProductInfo}
+                  disabled={isProcessing}
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                >
+                  <Wand2 className="w-4 h-4 mr-2" />
+                  {isProcessing ? "Generating..." : "Generate Product Info"}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Generated Product Info */}
+        {generatedData && (
+          <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-green-800">
+                <Wand2 className="w-5 h-5" />
+                AI Generated Product Info
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Title:</label>
+                <p className="text-lg font-semibold text-gray-900">{generatedData.title}</p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">Description:</label>
+                <p className="text-gray-800 leading-relaxed">{generatedData.description}</p>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Category:</label>
+                  <Badge className="ml-2 bg-blue-100 text-blue-800">
+                    {generatedData.category}
+                  </Badge>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Suggested Price:</label>
+                  <p className="text-lg font-semibold text-green-600">${generatedData.suggested_price}</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">Tags:</label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {generatedData.tags?.map((tag, index) => (
+                    <Badge key={index} variant="secondary">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {generatedData.key_features && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Key Features:</label>
+                  <ul className="mt-1 space-y-1">
+                    {generatedData.key_features.map((feature, index) => (
+                      <li key={index} className="flex items-center gap-2 text-gray-700">
+                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="pt-4 flex justify-end">
+                <Button 
+                  onClick={handleContinue}
+                  size="lg"
+                  className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+                >
+                  Continue to Photos
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}

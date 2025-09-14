@@ -1,0 +1,155 @@
+import React, { useState, useRef } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Search, Mic, MicOff, AlertCircle } from "lucide-react";
+
+export default function MarketplaceSearch({ searchQuery, onSearchChange, userLanguage }) {
+  const [isListening, setIsListening] = useState(false);
+  const [speechError, setSpeechError] = useState(null);
+  const recognitionRef = useRef(null);
+
+  const startVoiceSearch = async () => {
+    setSpeechError(null);
+    
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      setSpeechError("Voice search is not supported in this browser. Please try Chrome, Edge, or Safari.");
+      return;
+    }
+
+    try {
+      // Request microphone permission first
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (permissionError) {
+      setSpeechError("Microphone access denied. Please allow microphone access to use voice search.");
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+    
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = userLanguage === 'spanish' ? 'es-ES' : 
+                     userLanguage === 'french' ? 'fr-FR' : 
+                     userLanguage === 'hindi' ? 'hi-IN' :
+                     'en-US';
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      setSpeechError(null);
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      onSearchChange(transcript);
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+      
+      switch (event.error) {
+        case 'not-allowed':
+          setSpeechError("Microphone access denied. Please click the microphone icon in your browser and allow access.");
+          break;
+        case 'no-speech':
+          setSpeechError("No speech detected. Please try speaking your search term clearly.");
+          break;
+        case 'audio-capture':
+          setSpeechError("No microphone found. Please check your microphone connection.");
+          break;
+        case 'network':
+          setSpeechError("Network error. Please check your internet connection.");
+          break;
+        default:
+          setSpeechError("Voice search failed. Please try typing your search instead.");
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    try {
+      recognition.start();
+    } catch (error) {
+      setSpeechError("Failed to start voice search. Please try typing instead.");
+      setIsListening(false);
+    }
+  };
+
+  const stopVoiceSearch = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setIsListening(false);
+  };
+
+  const dismissError = () => {
+    setSpeechError(null);
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-4">
+      {/* Speech Error Alert */}
+      {speechError && (
+        <Alert variant="destructive" className="text-left">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="text-sm">
+            {speechError}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={dismissError}
+              className="ml-2 h-6 px-2 text-xs"
+            >
+              Dismiss
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="relative flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Search for handmade treasures..."
+            className="pl-10 pr-4 py-3 text-lg rounded-xl border-2 border-orange-200 focus:border-orange-500 bg-white/80 backdrop-blur-sm"
+          />
+        </div>
+        
+        <Button
+          onClick={isListening ? stopVoiceSearch : startVoiceSearch}
+          size="lg"
+          className={`px-4 py-3 rounded-xl transition-all shadow-lg ${
+            isListening 
+              ? "bg-gradient-to-r from-red-500 to-pink-500 animate-pulse" 
+              : "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+          }`}
+          title="Voice search - click to speak your search"
+        >
+          {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+        </Button>
+      </div>
+      
+      {isListening && (
+        <div className="text-center">
+          <Badge className="bg-red-100 text-red-700 animate-pulse">
+            🔴 Listening for your search...
+          </Badge>
+        </div>
+      )}
+      
+      <div className="text-center">
+        <p className="text-sm text-gray-500">
+          Try searching for: "jewelry", "pottery", "textiles", or use the 🎤 voice search
+        </p>
+      </div>
+    </div>
+  );
+}

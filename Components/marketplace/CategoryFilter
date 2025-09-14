@@ -1,0 +1,41 @@
+import React from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+
+const categories = [
+  { value: "all", label: "All Items", icon: "🛍️" },
+  { value: "textiles", label: "Textiles", icon: "🧵" },
+  { value: "pottery", label: "Pottery", icon: "🏺" },
+  { value: "jewelry", label: "Jewelry", icon: "💎" },
+  { value: "woodwork", label: "Woodwork", icon: "🪵" },
+  { value: "metalwork", label: "Metalwork", icon: "⚒️" },
+  { value: "paintings", label: "Paintings", icon: "🎨" },
+  { value: "sculptures", label: "Sculptures", icon: "🗿" },
+  { value: "crafts", label: "Crafts", icon: "✂️" },
+  { value: "other", label: "Other", icon: "🎁" },
+];
+
+export default function CategoryFilter({ selectedCategory, onCategoryChange }) {
+  return (
+    <div className="mb-8">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">Browse by Category</h3>
+      <div className="flex flex-wrap gap-3">
+        {categories.map((category) => (
+          <Button
+            key={category.value}
+            onClick={() => onCategoryChange(category.value)}
+            variant={selectedCategory === category.value ? "default" : "outline"}
+            className={`transition-all transform hover:scale-105 ${
+              selectedCategory === category.value
+                ? "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg"
+                : "border-orange-200 text-gray-700 hover:border-orange-500 hover:text-orange-700"
+            }`}
+          >
+            <span className="mr-2">{category.icon}</span>
+            {category.label}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
