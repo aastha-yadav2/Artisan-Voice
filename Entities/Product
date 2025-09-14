@@ -1,0 +1,98 @@
+{
+  "name": "Product",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Product title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Product description"
+    },
+    "price": {
+      "type": "number",
+      "description": "Product price"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "textiles",
+        "pottery",
+        "jewelry",
+        "woodwork",
+        "metalwork",
+        "paintings",
+        "sculptures",
+        "crafts",
+        "other"
+      ],
+      "description": "Product category"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Auto-generated and custom tags"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "Product image URL"
+    },
+    "original_image_url": {
+      "type": "string",
+      "description": "Original uploaded image URL"
+    },
+    "enhanced_image_url": {
+      "type": "string",
+      "description": "AI-enhanced image URL"
+    },
+    "artisan_id": {
+      "type": "string",
+      "description": "ID of the artisan who created this product"
+    },
+    "artisan_name": {
+      "type": "string",
+      "description": "Name of the artisan"
+    },
+    "voice_description_url": {
+      "type": "string",
+      "description": "URL to artisan's voice note about the product"
+    },
+    "language": {
+      "type": "string",
+      "enum": [
+        "english",
+        "spanish",
+        "french",
+        "hindi",
+        "arabic",
+        "portuguese",
+        "swahili"
+      ],
+      "default": "english",
+      "description": "Language used for the product"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "sold",
+        "inactive"
+      ],
+      "default": "active",
+      "description": "Product status"
+    },
+    "location": {
+      "type": "string",
+      "description": "Artisan's location"
+    }
+  },
+  "required": [
+    "title",
+    "price",
+    "artisan_id",
+    "artisan_name"
+  ]
+}
